@@ -145,5 +145,91 @@ footer{border-top:1px solid var(--border);margin-top:1.25rem;padding-top:.5rem;t
 
   <footer>Останнє оновлення:<br>2026-11-10</footer>
 </main>
+<script>
+/* Обхід DOM-дерева з діалогами та функціями зворотного виклику (callback) */
+(function () {
+  "use strict";
+
+  /* Скорочений опис вузла: тег, атрибути, власний текст */
+  function describe(el) {
+    var s = "<" + el.tagName.toLowerCase();
+    for (var i = 0; i < el.attributes.length; i++) {
+      var at = el.attributes[i];
+      var v = at.value.length > 30 ? at.value.slice(0, 30) + "..." : at.value;
+      s += " " + at.name + '="' + v + '"';
+    }
+    s += ">";
+    var own = "";
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) own += c.nodeValue;
+    }
+    own = own.replace(/\s+/g, " ").trim();
+    if (own) {
+      s += "\nТекст: " + (own.length > 60 ? own.slice(0, 60) + "..." : own);
+    } else {
+      s += "\nТекст: (немає)";
+    }
+    s += "\nДочірніх елементів: " + el.children.length;
+    return s;
+  }
+
+  /* Усі елементи дерева в порядку обходу в глибину (без <script>) */
+  function collectNodes() {
+    var list = [];
+    var walker = document.createTreeWalker(
+      document.documentElement,
+      NodeFilter.SHOW_ELEMENT,
+      { acceptNode: function (n) {
+          return n.tagName === "SCRIPT" ? NodeFilter.FILTER_REJECT
+                                        : NodeFilter.FILTER_ACCEPT;
+        } }
+    );
+    do { list.push(walker.currentNode); } while (walker.nextNode());
+    return list;
+  }
+
+  /* Діалог із двома відповідями. Результат передається у callback-функції.
+     OK -> onYes, Скасувати -> onNo. Виклик через setTimeout, щоб стек
+     не ріс при довгому блуканні туди й назад. */
+  function ask(text, onYes, onNo) {
+    var answer = window.confirm(text);
+    setTimeout(answer ? onYes : onNo, 0);
+  }
+
+  function finish() {
+    window.alert("Обхід DOM завершено.");
+  }
+
+  function start() {
+    var nodes = collectNodes();
+    var last = nodes.length - 1;
+
+    function visit(i) {
+      var head = "Вузол " + (i + 1) + " з " + nodes.length + "\n\n" + describe(nodes[i]) + "\n\n";
+
+      if (i === 0) {
+        /* перший вузол: далі або завершити */
+        ask(head + "OK — перейти до наступного вузла\nСкасувати — завершити роботу",
+            function () { visit(i + 1); },
+            finish);
+      } else if (i === last) {
+        /* нижній вузол: назад або вийти */
+        ask(head + "Це останній вузол.\nOK — повернутися назад\nСкасувати — вийти",
+            function () { visit(i - 1); },
+            finish);
+      } else {
+        /* проміжний вузол: далі або назад */
+        ask(head + "OK — пройти далі\nСкасувати — повернутися назад",
+            function () { visit(i + 1); },
+            function () { visit(i - 1); });
+      }
+    }
+
+    visit(0);
+  }
+
+  window.addEventListener("load", start);
+})();
+</script>
 </body>
 </html>
